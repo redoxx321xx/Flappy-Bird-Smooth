@@ -2,5 +2,7 @@
   "name": "Flappy Bird",
   "description": "Classic arcade Flappy Bird game with smooth physics, retro pixel aesthetics, day/night cycles, bird skins, audio synthesizer effects, and local high score persistence.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
