@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Green pipe in lower right -->
+    <path
+        android:fillColor="#543847"
+        android:pathData="M76,68 h20 v36 h-20 z" />
+    <path
+        android:fillColor="#73BF2E"
+        android:pathData="M78,70 h16 v34 h-16 z" />
+    <path
+        android:fillColor="#9DE644"
+        android:pathData="M79,70 h4 v34 h-4 z" />
+    <path
+        android:fillColor="#543847"
+        android:pathData="M74,62 h24 v8 h-24 z" />
+    <path
+        android:fillColor="#73BF2E"
+        android:pathData="M76,64 h20 v4 h-20 z" />
+    <path
+        android:fillColor="#9DE644"
+        android:pathData="M77,64 h4 v4 h-4 z" />
+
+    <!-- Flappy Bird body outline (dark pixel border) -->
+    <!-- Bird Body: Center around (50, 48) -->
+    <path
+        android:fillColor="#543847"
+        android:pathData="M38,34 h22 v4 h6 v4 h4 v6 h4 v14 h-4 v4 h-6 v4 h-22 v-4 h-6 v-6 h-4 v-12 h4 v-6 h6 z" />
+    
+    <!-- Bird Yellow Body -->
+    <path
+        android:fillColor="#F6C332"
+        android:pathData="M40,36 h18 v4 h6 v4 h4 v6 h-2 v12 h-4 v4 h-4 v2 h-18 v-4 h-4 v-6 h-2 v-12 h2 v-4 h4 z" />
+    
+    <!-- Bird Belly Highlight -->
+    <path
+        android:fillColor="#FBE364"
+        android:pathData="M42,38 h12 v4 h-12 z" />
+
+    <!-- Big Eye White -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,34 h12 v12 h-12 z" />
+    <!-- Pupil -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M60,36 h4 v8 h-4 z" />
+
+    <!-- Orange Beak -->
+    <path
+        android:fillColor="#543847"
+        android:pathData="M64,48 h16 v12 h-16 z" />
+    <path
+        android:fillColor="#E86100"
+        android:pathData="M66,50 h12 v3 h-12 z M66,54 h10 v4 h-10 z" />
+    <path
+        android:fillColor="#FFA53C"
+        android:pathData="M66,50 h10 v2 h-10 z" />
+
+    <!-- Wing -->
+    <path
+        android:fillColor="#543847"
+        android:pathData="M32,46 h16 v10 h-16 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,48 h12 v6 h-12 z" />
+    <path
+        android:fillColor="#EDEDED"
+        android:pathData="M34,51 h12 v3 h-12 z" />
+
+    <!-- Rosy Cheek -->
+    <path
+        android:fillColor="#FF7A85"
+        android:pathData="M52,50 h4 v4 h-4 z" />
+</vector>
