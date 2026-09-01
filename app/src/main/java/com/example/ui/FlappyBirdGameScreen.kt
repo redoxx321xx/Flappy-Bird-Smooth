@@ -237,6 +237,253 @@ fun FlappyBirdGameScreen(
                 onDismiss = { viewModel.setShowTheme(false) }
             )
         }
+
+        // 9. 3-SECOND WELCOME & LOADING SCREEN (Created by CHAOS)
+        AnimatedVisibility(
+            visible = uiState.isWelcomeLoading,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(400))
+        ) {
+            WelcomeLoadingOverlay(
+                progress = uiState.welcomeProgress,
+                skin = uiState.selectedSkin,
+                onSkip = { viewModel.onWelcomeFinished() },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+@Composable
+private fun WelcomeLoadingOverlay(
+    progress: Float,
+    skin: BirdSkin,
+    onSkip: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "welcome_anim")
+    val birdBob by infiniteTransition.animateFloat(
+        initialValue = -12f,
+        targetValue = 12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "birdBob"
+    )
+    val glowPulse by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowPulse"
+    )
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer"
+    )
+
+    val percent = (progress * 100f).toInt().coerceIn(0, 100)
+
+    Box(
+        modifier = modifier
+            .testTag("welcome_loading_screen")
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0F1424),
+                        Color(0xFF1A1C38),
+                        Color(0xFF0B0D18)
+                    )
+                )
+            )
+            .clickable(onClick = onSkip),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp)
+        ) {
+            // Floating Bird in Glowing Circle
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(130.dp)
+                    .offset(y = birdBob.dp)
+            ) {
+                // Outer Pulsing Halo
+                Box(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xFFFFD700).copy(alpha = glowPulse * 0.45f),
+                                    Color(0xFF4EC0CA).copy(alpha = glowPulse * 0.2f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                // Inner Glow Sphere
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xFF2C3E50), Color(0xFF1A252F))
+                            )
+                        )
+                        .border(
+                            3.dp,
+                            Brush.sweepGradient(
+                                listOf(Color(0xFFFFD700), Color(0xFF4EC0CA), Color(0xFFFFD700))
+                            ),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BirdPreviewIcon(skin = skin, sizeDp = 48.dp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Main Game Title
+            Text(
+                text = "FLAPPY BIRD",
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                color = Color(0xFFFFF275),
+                letterSpacing = 3.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // "CREATED BY CHAOS" Badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color(0xFFFF8F00).copy(alpha = 0.9f),
+                                Color(0xFFFFD54F).copy(alpha = shimmerAlpha),
+                                Color(0xFFFF8F00).copy(alpha = 0.9f)
+                            )
+                        )
+                    )
+                    .border(2.dp, Color(0xFF543847), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 20.dp, vertical = 7.dp)
+            ) {
+                Text(
+                    text = "CREATED BY CHAOS",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFF2D1B00),
+                    letterSpacing = 2.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Tagline: "Just Enjoy"
+            Text(
+                text = "✨ Just Enjoy ✨",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = Color(0xFF90E8F0).copy(alpha = shimmerAlpha),
+                letterSpacing = 1.5.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(42.dp))
+
+            // 3-Second Loading Bar
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth(0.85f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(Color(0xFF141829))
+                        .border(2.dp, Color(0xFF543847), RoundedCornerShape(9.dp))
+                        .padding(2.5.dp)
+                ) {
+                    // Filled Progress
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress)
+                            .height(13.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color(0xFF00E676),
+                                        Color(0xFF00E5FF),
+                                        Color(0xFFFFD700)
+                                    )
+                                )
+                            )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "READY TO FLY",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xCC90E8F0)
+                    )
+                    Text(
+                        text = "$percent%",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFFFFD700)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = "TAP SCREEN TO START",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                color = Color(0x66FFFFFF),
+                letterSpacing = 1.sp
+            )
+        }
     }
 }
 
@@ -266,12 +513,17 @@ private fun GameCanvas(
             birdRotation = viewModel.birdRotation,
             birdWingFrame = viewModel.birdWingFrame,
             birdRadiusDp = viewModel.birdRadiusDp,
+            birdScaleX = viewModel.birdScaleX,
+            birdScaleY = viewModel.birdScaleY,
             groundY = viewModel.groundY,
             groundScrollX = viewModel.groundScrollX,
             cloudScrollX = viewModel.cloudScrollX,
             cityScrollX = viewModel.cityScrollX,
             pipes = viewModel.pipes,
             particles = viewModel.particles,
+            windRipples = viewModel.windRipples,
+            scorePopups = viewModel.scorePopups,
+            ambientPetals = viewModel.ambientPetals,
             flashEffect = viewModel.flashEffect,
             screenShake = viewModel.screenShake
         )
@@ -1004,22 +1256,8 @@ fun SkinSelectorDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Mini Bird Preview Circle
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(skin.primaryColor)
-                                        .border(2.dp, Color(0xFF543847), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(10.dp)
-                                            .clip(CircleShape)
-                                            .background(skin.beakColor)
-                                    )
-                                }
+                                // Mini Bird Preview
+                                BirdPreviewIcon(skin = skin, sizeDp = 38.dp)
                                 Spacer(modifier = Modifier.width(14.dp))
                                 Column {
                                     Text(

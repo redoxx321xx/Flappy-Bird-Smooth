@@ -1,5 +1,7 @@
 package com.example.ui
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -9,12 +11,19 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import com.example.model.AmbientPetal
 import com.example.model.BirdSkin
 import com.example.model.GameTheme
 import com.example.model.Particle
 import com.example.model.PipeData
+import com.example.model.ScorePopup
+import com.example.model.WindRipple
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -26,6 +35,22 @@ object FlappyRenderer {
     private val beakPath = Path()
     private val lowerBeakPath = Path()
     private val stripePath = Path()
+    private val mountainPath = Path()
+    private val petalPath = Path()
+
+    // Pre-allocated text paints for zero-allocation popup rendering
+    private val popupTextPaint = Paint().apply {
+        isAntiAlias = true
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+    }
+
+    private val popupShadowPaint = Paint().apply {
+        isAntiAlias = true
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        color = 0xFF543847.toInt()
+    }
 
     // Pre-allocated static layout tables
     // Building tuples: (bx_dp, bh_dp, bw_dp)
@@ -39,6 +64,13 @@ object FlappyRenderer {
         222f, 85f, 36f,
         258f, 120f, 38f,
         296f, 75f, 24f
+    )
+
+    // Mountain silhouettes in background: (mx_fraction, my_fraction, mw_fraction, mh_fraction)
+    private val MOUNTAIN_DEFS = floatArrayOf(
+        0.0f, 0.55f, 0.45f, 0.28f,
+        0.3f, 0.52f, 0.55f, 0.32f,
+        0.65f, 0.58f, 0.48f, 0.25f
     )
 
     // Cloud tuples: (cx_dp, cy_fraction, cw_dp)
@@ -92,12 +124,17 @@ object FlappyRenderer {
         birdRotation: Float,
         birdWingFrame: Float,
         birdRadiusDp: Float,
+        birdScaleX: Float = 1f,
+        birdScaleY: Float = 1f,
         groundY: Float,
         groundScrollX: Float,
         cloudScrollX: Float,
         cityScrollX: Float,
         pipes: List<PipeData>,
         particles: List<Particle>,
+        windRipples: List<WindRipple> = emptyList(),
+        scorePopups: List<ScorePopup> = emptyList(),
+        ambientPetals: List<AmbientPetal> = emptyList(),
         flashEffect: Float,
         screenShake: Float
     ) {
@@ -111,38 +148,138 @@ object FlappyRenderer {
                 size = Size(width, height)
             )
 
-            // If Night, draw glowing moon and twinkling stars
+            // Celestial Body: Radiant Sun or Glowing Moon & Stars
             if (theme.isNight) {
                 drawMoonAndStars(width, density)
+            } else {
+                drawSunAndRays(width, density, theme)
             }
 
-            // 2. Parallax City Skyline / Hills
+            // 2. Parallax Distant Mountain Silhouettes & City Skyline
+            drawMountainLayer(width, groundY, cityScrollX * 0.45f, theme, density)
             drawCitySkyline(width, groundY, cityScrollX, theme.skylineColor, density)
 
             // 3. Parallax Clouds
             drawClouds(width, groundY, cloudScrollX, theme.cloudColor, density)
 
-            // 4. Pipes
+            // 4. Ambient Nature Floating Petals / Leaves (Behind Pipes for Depth)
+            drawAmbientPetals(ambientPetals)
+
+            // 5. Pipes
             drawPipes(pipes, groundY, theme, density)
 
-            // 5. Coins
+            // 6. Coins
             drawCoins(pipes, density)
 
-            // 6. Particles
+            // 7. Wind Ripples from Flapping
+            drawWindRipples(windRipples)
+
+            // 8. Particles
             drawParticles(particles)
 
-            // 7. Ground
+            // 9. Ground
             drawGround(width, height, groundY, groundScrollX, theme, density)
 
-            // 8. Bird
-            drawBird(birdX, birdY, birdRotation, birdWingFrame, birdRadiusDp * density, skin, density)
+            // 10. Bird with Squash & Stretch
+            drawBird(
+                birdX, birdY, birdRotation, birdWingFrame,
+                birdRadiusDp * density, skin, density,
+                birdScaleX, birdScaleY
+            )
 
-            // 9. Screen Flash
+            // 11. Floating Score & Praise Popups
+            drawScorePopups(scorePopups, density)
+
+            // 12. Screen Flash
             if (flashEffect > 0.01f) {
                 drawRect(
                     color = Color.White.copy(alpha = (flashEffect * 0.85f).coerceIn(0f, 1f)),
                     size = Size(width, height)
                 )
+            }
+        }
+    }
+
+    private fun DrawScope.drawSunAndRays(width: Float, density: Float, theme: GameTheme) {
+        val sunX = if (theme == GameTheme.SUNSET) width * 0.78f else width * 0.82f
+        val sunY = if (theme == GameTheme.SUNSET) 160f * density else 95f * density
+        val sunRadius = 26f * density
+        val glowColor = if (theme == GameTheme.SUNSET) Color(0x35FFA000) else Color(0x30FFE082)
+        val outerGlow = if (theme == GameTheme.SUNSET) Color(0x18FF7043) else Color(0x18FFF9C4)
+        val sunBodyColor = if (theme == GameTheme.SUNSET) Color(0xFFFFCC80) else Color(0xFFFFF9C4)
+
+        // Outer soft radiant halo
+        drawCircle(color = outerGlow, radius = sunRadius * 2.2f, center = Offset(sunX, sunY))
+        drawCircle(color = glowColor, radius = sunRadius * 1.5f, center = Offset(sunX, sunY))
+        // Sun core
+        drawCircle(color = sunBodyColor, radius = sunRadius, center = Offset(sunX, sunY))
+    }
+
+    private fun DrawScope.drawMountainLayer(
+        width: Float,
+        groundY: Float,
+        scrollX: Float,
+        theme: GameTheme,
+        density: Float
+    ) {
+        val mountainBaseColor = when (theme) {
+            GameTheme.DAY -> Color(0x4055A8A3)
+            GameTheme.NIGHT -> Color(0x350A102A)
+            GameTheme.SUNSET -> Color(0x458E24AA)
+        }
+        val segmentW = 420f * density
+        val totalSegments = (width / segmentW).toInt() + 3
+        val baseOffset = -(scrollX % segmentW)
+
+        for (s in -1 until totalSegments) {
+            val offsetX = baseOffset + s * segmentW
+            var i = 0
+            while (i < MOUNTAIN_DEFS.size) {
+                val mx = MOUNTAIN_DEFS[i] * segmentW
+                val my = groundY * MOUNTAIN_DEFS[i + 1]
+                val mw = MOUNTAIN_DEFS[i + 2] * segmentW
+                val mh = groundY * MOUNTAIN_DEFS[i + 3]
+                i += 4
+
+                val peakX = offsetX + mx + (mw * 0.5f)
+                val peakY = my - mh
+                val leftX = offsetX + mx
+                val rightX = offsetX + mx + mw
+
+                mountainPath.reset()
+                mountainPath.moveTo(leftX, groundY)
+                mountainPath.lineTo(peakX, peakY)
+                mountainPath.lineTo(rightX, groundY)
+                mountainPath.close()
+
+                drawPath(mountainPath, color = mountainBaseColor)
+            }
+        }
+    }
+
+    private fun DrawScope.drawAmbientPetals(petals: List<AmbientPetal>) {
+        if (petals.isEmpty()) return
+        val count = petals.size
+        for (i in 0 until count) {
+            val p = petals[i]
+            if (p.alpha <= 0.01f) continue
+
+            rotate(degrees = p.rotation, pivot = Offset(p.x, p.y)) {
+                petalPath.reset()
+                val r = p.size
+                petalPath.moveTo(p.x, p.y - r)
+                petalPath.cubicTo(
+                    p.x + r * 0.9f, p.y - r * 0.5f,
+                    p.x + r * 0.9f, p.y + r * 0.5f,
+                    p.x, p.y + r
+                )
+                petalPath.cubicTo(
+                    p.x - r * 0.9f, p.y + r * 0.5f,
+                    p.x - r * 0.9f, p.y - r * 0.5f,
+                    p.x, p.y - r
+                )
+                petalPath.close()
+                drawPath(petalPath, color = p.color.copy(alpha = p.alpha))
             }
         }
     }
@@ -584,157 +721,176 @@ object FlappyRenderer {
         wingFrame: Float,
         radius: Float,
         skin: BirdSkin,
-        density: Float
+        density: Float,
+        scaleX: Float = 1f,
+        scaleY: Float = 1f
     ) {
         val darkOutline = Color(0xFF543847)
         val outlineW = 2.2f * density
 
-        rotate(degrees = rotationDeg, pivot = Offset(bx, by)) {
-            // Optional Aura Glow
-            if (skin.glowColor != null) {
+        scale(scaleX = scaleX, scaleY = scaleY, pivot = Offset(bx, by)) {
+            rotate(degrees = rotationDeg, pivot = Offset(bx, by)) {
+                // Optional Aura Glow
+                if (skin.glowColor != null) {
+                    drawCircle(
+                        color = skin.glowColor.copy(alpha = 0.35f),
+                        radius = radius * 1.55f,
+                        center = Offset(bx, by)
+                    )
+                }
+
+                // 1. Bird Main Body Outline
                 drawCircle(
-                    color = skin.glowColor.copy(alpha = 0.35f),
-                    radius = radius * 1.55f,
+                    color = darkOutline,
+                    radius = radius + outlineW,
                     center = Offset(bx, by)
                 )
-            }
 
-            // 1. Bird Main Body Outline
-            drawCircle(
-                color = darkOutline,
-                radius = radius + outlineW,
-                center = Offset(bx, by)
-            )
+                // 2. Main Bird Body Fill
+                drawCircle(
+                    color = skin.primaryColor,
+                    radius = radius,
+                    center = Offset(bx, by)
+                )
 
-            // 2. Main Bird Body Fill
-            drawCircle(
-                color = skin.primaryColor,
-                radius = radius,
-                center = Offset(bx, by)
-            )
+                // 3. Belly highlight
+                drawCircle(
+                    color = skin.bellyColor,
+                    radius = radius * 0.75f,
+                    center = Offset(bx + radius * 0.15f, by + radius * 0.25f)
+                )
 
-            // 3. Belly highlight
-            drawCircle(
-                color = skin.bellyColor,
-                radius = radius * 0.75f,
-                center = Offset(bx + radius * 0.15f, by + radius * 0.25f)
-            )
+                // 4. Rosy Cheek
+                drawCircle(
+                    color = skin.cheekColor,
+                    radius = radius * 0.22f,
+                    center = Offset(bx + radius * 0.15f, by + radius * 0.35f)
+                )
 
-            // 4. Rosy Cheek
-            drawCircle(
-                color = skin.cheekColor,
-                radius = radius * 0.22f,
-                center = Offset(bx + radius * 0.15f, by + radius * 0.35f)
-            )
+                // 5. Eye
+                val eyeX = bx + radius * 0.45f
+                val eyeY = by - radius * 0.30f
+                val eyeRadius = radius * 0.42f
 
-            // 5. Eye
-            val eyeX = bx + radius * 0.45f
-            val eyeY = by - radius * 0.30f
-            val eyeRadius = radius * 0.42f
-
-            // Eye outline
-            drawCircle(
-                color = darkOutline,
-                radius = eyeRadius + outlineW,
-                center = Offset(eyeX, eyeY)
-            )
-            // Eye White
-            drawCircle(
-                color = skin.eyeColor,
-                radius = eyeRadius,
-                center = Offset(eyeX, eyeY)
-            )
-            // Eye Pupil
-            val pupilX = eyeX + eyeRadius * 0.28f
-            val pupilY = eyeY - eyeRadius * 0.05f
-            drawCircle(
-                color = Color.Black,
-                radius = eyeRadius * 0.42f,
-                center = Offset(pupilX, pupilY)
-            )
-            // Pupil Highlight
-            drawCircle(
-                color = Color.White,
-                radius = eyeRadius * 0.16f,
-                center = Offset(pupilX - 1.5f * density, pupilY - 1.5f * density)
-            )
-
-            // 6. Beak
-            val beakStartX = bx + radius * 0.7f
-            val beakTopY = by - radius * 0.05f
-
-            // Top Beak
-            beakPath.reset()
-            beakPath.moveTo(beakStartX, beakTopY)
-            beakPath.lineTo(beakStartX + radius * 0.65f, beakTopY + radius * 0.2f)
-            beakPath.lineTo(beakStartX, beakTopY + radius * 0.35f)
-            beakPath.close()
-
-            drawPath(
-                path = beakPath,
-                color = darkOutline,
-                style = Stroke(width = outlineW * 1.5f)
-            )
-            drawPath(
-                path = beakPath,
-                color = skin.beakColor,
-                style = Fill
-            )
-
-            // Lower Beak
-            lowerBeakPath.reset()
-            lowerBeakPath.moveTo(beakStartX, beakTopY + radius * 0.30f)
-            lowerBeakPath.lineTo(beakStartX + radius * 0.5f, beakTopY + radius * 0.38f)
-            lowerBeakPath.lineTo(beakStartX, beakTopY + radius * 0.55f)
-            lowerBeakPath.close()
-
-            drawPath(
-                path = lowerBeakPath,
-                color = darkOutline,
-                style = Stroke(width = outlineW * 1.5f)
-            )
-            drawPath(
-                path = lowerBeakPath,
-                color = skin.beakColor,
-                style = Fill
-            )
-
-            // 7. Flapping Wing
-            val wingAngle = when (wingFrame.toInt() % 3) {
-                0 -> -35f
-                1 -> 0f
-                else -> 35f
-            }
-
-            val wingCenterX = bx - radius * 0.35f
-            val wingCenterY = by + radius * 0.1f
-
-            rotate(degrees = wingAngle, pivot = Offset(wingCenterX, wingCenterY)) {
-                val wingW = radius * 0.85f
-                val wingH = radius * 0.55f
-
-                // Wing outline
-                drawRoundRect(
+                // Eye outline
+                drawCircle(
                     color = darkOutline,
-                    topLeft = Offset(wingCenterX - wingW * 0.5f - outlineW, wingCenterY - wingH * 0.5f - outlineW),
-                    size = Size(wingW + outlineW * 2f, wingH + outlineW * 2f),
-                    cornerRadius = CornerRadius(wingH * 0.5f, wingH * 0.5f)
+                    radius = eyeRadius + outlineW,
+                    center = Offset(eyeX, eyeY)
+                )
+                // Eye White
+                drawCircle(
+                    color = skin.eyeColor,
+                    radius = eyeRadius,
+                    center = Offset(eyeX, eyeY)
+                )
+                // Eye Pupil
+                val pupilX = eyeX + eyeRadius * 0.28f
+                val pupilY = eyeY - eyeRadius * 0.05f
+                drawCircle(
+                    color = Color.Black,
+                    radius = eyeRadius * 0.42f,
+                    center = Offset(pupilX, pupilY)
+                )
+                // Pupil Highlight
+                drawCircle(
+                    color = Color.White,
+                    radius = eyeRadius * 0.16f,
+                    center = Offset(pupilX - 1.5f * density, pupilY - 1.5f * density)
                 )
 
-                // Wing base
-                drawRoundRect(
-                    color = skin.wingColor,
-                    topLeft = Offset(wingCenterX - wingW * 0.5f, wingCenterY - wingH * 0.5f),
-                    size = Size(wingW, wingH),
-                    cornerRadius = CornerRadius(wingH * 0.5f, wingH * 0.5f)
+                // 6. Beak
+                val beakStartX = bx + radius * 0.7f
+                val beakTopY = by - radius * 0.05f
+
+                // Top Beak
+                beakPath.reset()
+                beakPath.moveTo(beakStartX, beakTopY)
+                beakPath.lineTo(beakStartX + radius * 0.65f, beakTopY + radius * 0.2f)
+                beakPath.lineTo(beakStartX, beakTopY + radius * 0.35f)
+                beakPath.close()
+
+                drawPath(
+                    path = beakPath,
+                    color = darkOutline,
+                    style = Stroke(width = outlineW * 1.5f)
+                )
+                drawPath(
+                    path = beakPath,
+                    color = skin.beakColor,
+                    style = Fill
                 )
 
-                // Wing bottom shadow
-                drawRoundRect(
-                    color = skin.secondaryColor.copy(alpha = 0.4f),
-                    topLeft = Offset(wingCenterX - wingW * 0.5f, wingCenterY),
-                    size = Size(wingW, wingH * 0.5f),
-                    cornerRadius = CornerRadius(wingH * 0.5f, wingH * 0.5f)
+                // Lower Beak
+                lowerBeakPath.reset()
+                lowerBeakPath.moveTo(beakStartX, beakTopY + radius * 0.30f)
+                lowerBeakPath.lineTo(beakStartX + radius * 0.5f, beakTopY + radius * 0.38f)
+                lowerBeakPath.lineTo(beakStartX, beakTopY + radius * 0.55f)
+                lowerBeakPath.close()
+
+                drawPath(
+                    path = lowerBeakPath,
+                    color = darkOutline,
+                    style = Stroke(width = outlineW * 1.5f)
+                )
+                drawPath(
+                    path = lowerBeakPath,
+                    color = skin.beakColor,
+                    style = Fill
+                )
+
+                // 7. Flapping Wing
+                val wingAngle = when (wingFrame.toInt() % 3) {
+                    0 -> -35f
+                    1 -> 0f
+                    else -> 35f
+                }
+
+                val wingCenterX = bx - radius * 0.35f
+                val wingCenterY = by + radius * 0.1f
+
+                rotate(degrees = wingAngle, pivot = Offset(wingCenterX, wingCenterY)) {
+                    val wingW = radius * 0.85f
+                    val wingH = radius * 0.55f
+
+                    // Wing outline
+                    drawRoundRect(
+                        color = darkOutline,
+                        topLeft = Offset(wingCenterX - wingW * 0.5f - outlineW, wingCenterY - wingH * 0.5f - outlineW),
+                        size = Size(wingW + outlineW * 2f, wingH + outlineW * 2f),
+                        cornerRadius = CornerRadius(wingH * 0.5f, wingH * 0.5f)
+                    )
+
+                    // Wing base
+                    drawRoundRect(
+                        color = skin.wingColor,
+                        topLeft = Offset(wingCenterX - wingW * 0.5f, wingCenterY - wingH * 0.5f),
+                        size = Size(wingW, wingH),
+                        cornerRadius = CornerRadius(wingH * 0.5f, wingH * 0.5f)
+                    )
+
+                    // Wing bottom shadow
+                    drawRoundRect(
+                        color = skin.secondaryColor.copy(alpha = 0.4f),
+                        topLeft = Offset(wingCenterX - wingW * 0.5f, wingCenterY),
+                        size = Size(wingW, wingH * 0.5f),
+                        cornerRadius = CornerRadius(wingH * 0.5f, wingH * 0.5f)
+                    )
+                }
+            }
+        }
+    }
+
+    private fun DrawScope.drawWindRipples(ripples: List<WindRipple>) {
+        val count = ripples.size
+        for (i in 0 until count) {
+            val r = ripples[i]
+            if (r.alpha > 0.01f) {
+                drawCircle(
+                    color = r.color.copy(alpha = r.alpha),
+                    radius = r.radius,
+                    center = Offset(r.x, r.y),
+                    style = Stroke(width = 2.5f)
                 )
             }
         }
@@ -750,6 +906,33 @@ object FlappyRenderer {
                     radius = p.size,
                     center = Offset(p.x, p.y)
                 )
+            }
+        }
+    }
+
+    private fun DrawScope.drawScorePopups(popups: List<ScorePopup>, density: Float) {
+        if (popups.isEmpty()) return
+        val count = popups.size
+        drawIntoCanvas { canvas ->
+            for (i in 0 until count) {
+                val pop = popups[i]
+                if (pop.alpha <= 0.01f) continue
+
+                val textSizePx = 20f * density * pop.scale
+                popupTextPaint.textSize = textSizePx
+                popupTextPaint.color = pop.color.toArgb()
+                popupTextPaint.alpha = (pop.alpha * 255f).toInt().coerceIn(0, 255)
+
+                popupShadowPaint.textSize = textSizePx
+                popupShadowPaint.alpha = (pop.alpha * 200f).toInt().coerceIn(0, 255)
+
+                val x = size.width * 0.5f
+                val y = size.height * 0.32f + pop.yOffset
+
+                // Shadow
+                canvas.nativeCanvas.drawText(pop.text, x, y + 2.5f * density, popupShadowPaint)
+                // Text
+                canvas.nativeCanvas.drawText(pop.text, x, y, popupTextPaint)
             }
         }
     }

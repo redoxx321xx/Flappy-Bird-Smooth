@@ -356,3 +356,63 @@ fun TapToFlapPrompt(modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Composable
+fun BirdPreviewIcon(
+    skin: com.example.model.BirdSkin,
+    sizeDp: Dp = 36.dp,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(sizeDp)
+            .clip(CircleShape)
+            .background(skin.primaryColor)
+            .border(2.5.dp, Color(0xFF543847), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        // Belly highlight
+        Box(
+            modifier = Modifier
+                .size(sizeDp * 0.65f)
+                .offset(x = sizeDp * 0.1f, y = sizeDp * 0.18f)
+                .clip(CircleShape)
+                .background(skin.bellyColor)
+        )
+        // Eye
+        Box(
+            modifier = Modifier
+                .size(sizeDp * 0.4f)
+                .offset(x = sizeDp * 0.22f, y = -sizeDp * 0.15f)
+                .clip(CircleShape)
+                .background(Color.White)
+                .border(1.5.dp, Color(0xFF543847), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(sizeDp * 0.18f)
+                    .clip(CircleShape)
+                    .background(Color.Black)
+            )
+        }
+        // Beak
+        Box(
+            modifier = Modifier
+                .size(sizeDp * 0.35f, sizeDp * 0.24f)
+                .offset(x = sizeDp * 0.44f, y = sizeDp * 0.05f)
+                .clip(RoundedCornerShape(sizeDp * 0.1f))
+                .background(skin.beakColor)
+                .border(1.5.dp, Color(0xFF543847), RoundedCornerShape(sizeDp * 0.1f))
+        )
+        // Wing
+        Box(
+            modifier = Modifier
+                .size(sizeDp * 0.45f, sizeDp * 0.28f)
+                .offset(x = -sizeDp * 0.18f, y = sizeDp * 0.1f)
+                .clip(RoundedCornerShape(sizeDp * 0.14f))
+                .background(skin.wingColor)
+                .border(1.5.dp, Color(0xFF543847), RoundedCornerShape(sizeDp * 0.14f))
+        )
+    }
+}

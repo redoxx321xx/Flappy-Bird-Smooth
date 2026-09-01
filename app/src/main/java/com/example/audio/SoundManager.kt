@@ -12,22 +12,26 @@ class SoundManager {
 
     private val sampleRate = 22050
 
-    // Pre-allocated static AudioTracks for instant, zero-allocation playback
+    // Pre-allocated static AudioTracks for instant, zero-latency playback
     private var flapTrack: AudioTrack? = null
     private var pointTrack: AudioTrack? = null
+    private var milestoneTrack: AudioTrack? = null
     private var coinTrack: AudioTrack? = null
     private var hitTrack: AudioTrack? = null
     private var swooshTrack: AudioTrack? = null
     private var clickTrack: AudioTrack? = null
+    private var welcomeTrack: AudioTrack? = null
 
     init {
         try {
-            flapTrack = createStaticTrack(generateFlapSound())
-            pointTrack = createStaticTrack(generatePointSound())
-            coinTrack = createStaticTrack(generateCoinSound())
-            hitTrack = createStaticTrack(generateHitSound())
-            swooshTrack = createStaticTrack(generateSwooshSound())
-            clickTrack = createStaticTrack(generateClickSound())
+            flapTrack = createStaticTrack(generateSatisfyingFlapSound())
+            pointTrack = createStaticTrack(generateSatisfyingPointSound())
+            milestoneTrack = createStaticTrack(generateMilestoneSound())
+            coinTrack = createStaticTrack(generateSatisfyingCoinSound())
+            hitTrack = createStaticTrack(generateSatisfyingHitSound())
+            swooshTrack = createStaticTrack(generateSatisfyingSwooshSound())
+            clickTrack = createStaticTrack(generateSatisfyingClickSound())
+            welcomeTrack = createStaticTrack(generateWelcomeSound())
         } catch (_: Exception) {
             // Audio hardware fallback
         }
@@ -39,6 +43,10 @@ class SoundManager {
 
     fun playPoint() {
         playTrack(pointTrack)
+    }
+
+    fun playMilestone() {
+        playTrack(milestoneTrack)
     }
 
     fun playCoin() {
@@ -55,6 +63,10 @@ class SoundManager {
 
     fun playClick() {
         playTrack(clickTrack)
+    }
+
+    fun playWelcome() {
+        playTrack(welcomeTrack)
     }
 
     private fun playTrack(track: AudioTrack?) {
@@ -98,28 +110,29 @@ class SoundManager {
         }
     }
 
-    // Generate classic retro rising chirp for flap
-    private fun generateFlapSound(): ShortArray {
-        val duration = 0.08f // 80ms
+    // Ultra-satisfying ASMR bubble pop + soft acoustic resonant chime
+    private fun generateSatisfyingFlapSound(): ShortArray {
+        val duration = 0.09f // 90ms
         val numSamples = (duration * sampleRate).toInt()
         val buffer = ShortArray(numSamples)
-        val startFreq = 420.0
-        val endFreq = 900.0
+        val startFreq = 520.0
+        val endFreq = 960.0
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / sampleRate
             val progress = i.toDouble() / numSamples
-            val freq = startFreq + (endFreq - startFreq) * progress
-            val envelope = (1.0 - progress) * (1.0 - exp(-progress * 25.0))
-            val wave = sin(2.0 * PI * freq * t)
-            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.45).toInt().toShort()
+            val freq = startFreq + (endFreq - startFreq) * (progress * progress)
+            // Smooth bubble envelope with rapid attack and warm resonant body
+            val envelope = (1.0 - progress) * (1.0 - exp(-progress * 30.0))
+            val wave = sin(2.0 * PI * freq * t) + 0.25 * sin(4.0 * PI * freq * t) + 0.15 * sin(1.0 * PI * (startFreq * 0.5) * t)
+            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.42).toInt().toShort()
         }
         return buffer
     }
 
-    // Generate classic double-ding chime for passing a pipe
-    private fun generatePointSound(): ShortArray {
-        val duration = 0.16f // 160ms
+    // Heavenly crystal double-ding chime for passing a pipe (C6 -> E6 -> G6 overtone)
+    private fun generateSatisfyingPointSound(): ShortArray {
+        val duration = 0.22f // 220ms
         val numSamples = (duration * sampleRate).toInt()
         val buffer = ShortArray(numSamples)
         val halfSamples = numSamples / 2
@@ -132,61 +145,100 @@ class SoundManager {
             } else {
                 (i - halfSamples).toDouble() / (numSamples - halfSamples)
             }
-            val freq = if (isFirstHalf) 987.77 else 1318.51 // B5 to E6
-            val envelope = exp(-noteProgress * 5.0)
-            val wave = sin(2.0 * PI * freq * t) + 0.3 * sin(4.0 * PI * freq * t)
-            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.4).toInt().toShort()
+            val freq = if (isFirstHalf) 1046.50 else 1318.51 // C6 to E6
+            val envelope = exp(-noteProgress * 4.2)
+            // Pure bell crystal timbre with shimmer harmonic
+            val wave = sin(2.0 * PI * freq * t) + 0.35 * sin(4.0 * PI * freq * t) + 0.15 * sin(6.0 * PI * freq * t)
+            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.44).toInt().toShort()
         }
         return buffer
     }
 
-    // Generate sparkling high chime for coin pickup
-    private fun generateCoinSound(): ShortArray {
-        val duration = 0.14f
+    // Glorious milestone celebration fanfare chord (G5 - B5 - D6 - G6 cascade)
+    private fun generateMilestoneSound(): ShortArray {
+        val duration = 0.45f // 450ms
+        val numSamples = (duration * sampleRate).toInt()
+        val buffer = ShortArray(numSamples)
+        val step = numSamples / 4
+        val notes = doubleArrayOf(783.99, 987.77, 1174.66, 1567.98) // G5, B5, D6, G6
+
+        for (i in 0 until numSamples) {
+            val t = i.toDouble() / sampleRate
+            val noteIndex = (i / step).coerceAtMost(3)
+            val noteProg = (i % step).toDouble() / step
+            val globalProg = i.toDouble() / numSamples
+            val freq = notes[noteIndex]
+            val envelope = exp(-noteProg * 3.5) * (1.0 - globalProg * 0.4)
+            val wave = sin(2.0 * PI * freq * t) + 0.3 * sin(2.0 * PI * (freq * 2.0) * t)
+            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.48).toInt().toShort()
+        }
+        return buffer
+    }
+
+    // Sparkling juicy gold coin chime
+    private fun generateSatisfyingCoinSound(): ShortArray {
+        val duration = 0.18f
         val numSamples = (duration * sampleRate).toInt()
         val buffer = ShortArray(numSamples)
         val half = numSamples / 2
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / sampleRate
-            val freq = if (i < half) 1174.66 else 1760.0 // D6 to A6
+            val freq = if (i < half) 1318.51 else 1975.53 // E6 to B6
             val prog = if (i < half) i.toDouble() / half else (i - half).toDouble() / half
-            val envelope = exp(-prog * 6.0)
-            val wave = sin(2.0 * PI * freq * t)
-            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.4).toInt().toShort()
+            val envelope = exp(-prog * 5.0)
+            val wave = sin(2.0 * PI * freq * t) + 0.28 * sin(4.0 * PI * freq * t)
+            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.44).toInt().toShort()
         }
         return buffer
     }
 
-    // Generate thud & noise crunch for collision
-    private fun generateHitSound(): ShortArray {
-        val duration = 0.20f
+    // Soft warm retro impact with low-frequency resonance (gentle thud, satisfying)
+    private fun generateSatisfyingHitSound(): ShortArray {
+        val duration = 0.18f
         val numSamples = (duration * sampleRate).toInt()
         val buffer = ShortArray(numSamples)
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / sampleRate
             val progress = i.toDouble() / numSamples
-            val envelope = exp(-progress * 8.0)
-            val baseFreq = 160.0 * (1.0 - progress * 0.8)
+            val envelope = exp(-progress * 9.0)
+            val baseFreq = 180.0 * (1.0 - progress * 0.75)
             val tone = sin(2.0 * PI * baseFreq * t)
-            val noise = (Math.random() * 2.0 - 1.0) * 0.6
-            val mixed = (tone * 0.4 + noise * 0.6) * envelope
-            buffer[i] = (mixed * Short.MAX_VALUE * 0.6).toInt().toShort()
+            val softNoise = (Math.random() * 2.0 - 1.0) * 0.35
+            val mixed = (tone * 0.65 + softNoise * 0.35) * envelope
+            buffer[i] = (mixed * Short.MAX_VALUE * 0.50).toInt().toShort()
         }
         return buffer
     }
 
-    // Generate quick low-to-high whoosh
-    private fun generateSwooshSound(): ShortArray {
-        val duration = 0.10f
+    // Silky aerodynamic swoosh
+    private fun generateSatisfyingSwooshSound(): ShortArray {
+        val duration = 0.12f
         val numSamples = (duration * sampleRate).toInt()
         val buffer = ShortArray(numSamples)
 
         for (i in 0 until numSamples) {
             val progress = i.toDouble() / numSamples
             val envelope = sin(progress * PI)
-            val freq = 200.0 + progress * 600.0
+            val freq = 220.0 + progress * 750.0
+            val t = i.toDouble() / sampleRate
+            val wave = sin(2.0 * PI * freq * t)
+            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.38).toInt().toShort()
+        }
+        return buffer
+    }
+
+    // Clean tactile button click
+    private fun generateSatisfyingClickSound(): ShortArray {
+        val duration = 0.05f
+        val numSamples = (duration * sampleRate).toInt()
+        val buffer = ShortArray(numSamples)
+
+        for (i in 0 until numSamples) {
+            val progress = i.toDouble() / numSamples
+            val envelope = exp(-progress * 14.0)
+            val freq = 880.0
             val t = i.toDouble() / sampleRate
             val wave = sin(2.0 * PI * freq * t)
             buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.35).toInt().toShort()
@@ -194,19 +246,23 @@ class SoundManager {
         return buffer
     }
 
-    // Generate UI button click
-    private fun generateClickSound(): ShortArray {
-        val duration = 0.04f
+    // Welcome Screen Opening Harmonic Chord (C5 - E5 - G5 - C6)
+    private fun generateWelcomeSound(): ShortArray {
+        val duration = 0.6f // 600ms
         val numSamples = (duration * sampleRate).toInt()
         val buffer = ShortArray(numSamples)
 
         for (i in 0 until numSamples) {
-            val progress = i.toDouble() / numSamples
-            val envelope = exp(-progress * 12.0)
-            val freq = 800.0
             val t = i.toDouble() / sampleRate
-            val wave = sin(2.0 * PI * freq * t)
-            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.3).toInt().toShort()
+            val progress = i.toDouble() / numSamples
+            val envelope = (1.0 - progress) * (1.0 - exp(-progress * 15.0))
+            val wave = (
+                sin(2.0 * PI * 523.25 * t) +       // C5
+                sin(2.0 * PI * 659.25 * t) * 0.8 + // E5
+                sin(2.0 * PI * 783.99 * t) * 0.7 + // G5
+                sin(2.0 * PI * 1046.50 * t) * 0.6  // C6
+            ) * 0.28
+            buffer[i] = (wave * envelope * Short.MAX_VALUE * 0.5).toInt().toShort()
         }
         return buffer
     }
@@ -215,10 +271,12 @@ class SoundManager {
         try {
             flapTrack?.release()
             pointTrack?.release()
+            milestoneTrack?.release()
             coinTrack?.release()
             hitTrack?.release()
             swooshTrack?.release()
             clickTrack?.release()
+            welcomeTrack?.release()
         } catch (_: Exception) {}
     }
 }

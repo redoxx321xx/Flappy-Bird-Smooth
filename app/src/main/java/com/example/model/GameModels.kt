@@ -168,3 +168,34 @@ data class Particle(
     var life: Float = 1.0f,
     val decay: Float = 0.03f
 )
+
+data class WindRipple(
+    val x: Float,
+    val y: Float,
+    var radius: Float = 4f,
+    var maxRadius: Float = 36f,
+    var alpha: Float = 0.7f,
+    val color: Color = Color.White
+)
+
+data class ScorePopup(
+    val id: Long,
+    val text: String,
+    val color: Color,
+    var yOffset: Float = 0f,
+    var alpha: Float = 1f,
+    var scale: Float = 0.5f,
+    var life: Float = 1f
+)
+
+data class AmbientPetal(
+    var x: Float,
+    var y: Float,
+    var vx: Float,
+    var vy: Float,
+    var size: Float,
+    var rotation: Float,
+    var rotSpeed: Float,
+    var alpha: Float,
+    val color: Color
+)
